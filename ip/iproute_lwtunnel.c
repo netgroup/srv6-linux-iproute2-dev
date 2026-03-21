@@ -412,6 +412,7 @@ static const char *seg6_action_names[SEG6_LOCAL_ACTION_MAX + 1] = {
 	[SEG6_LOCAL_ACTION_END_AM]		= "End.AM",
 	[SEG6_LOCAL_ACTION_END_BPF]		= "End.BPF",
 	[SEG6_LOCAL_ACTION_END_DT46]		= "End.DT46",
+	[SEG6_LOCAL_ACTION_END_DT2U]		= "End.DT2U",
 };
 
 static const char *format_action_type(int action)
@@ -573,6 +574,13 @@ static void print_encap_seg6local(FILE *fp, struct rtattr *encap)
 
 		print_string(PRINT_ANY, "oif",
 			     "oif %s ", ll_index_to_name(oif));
+	}
+
+	if (tb[SEG6_LOCAL_L2DEV]) {
+		int l2dev = rta_getattr_u32(tb[SEG6_LOCAL_L2DEV]);
+
+		print_string(PRINT_ANY, "l2dev",
+			     "l2dev %s ", ll_index_to_name(l2dev));
 	}
 
 	if (tb[SEG6_LOCAL_BPF])
@@ -1470,12 +1478,13 @@ static int parse_encap_seg6local(struct rtattr *rta, size_t len, int *argcp,
 	int nh4_ok = 0, nh6_ok = 0, iif_ok = 0, oif_ok = 0, flavors_ok = 0;
 	int segs_ok = 0, hmac_ok = 0, table_ok = 0, vrftable_ok = 0;
 	int action_ok = 0, srh_ok = 0, bpf_ok = 0, counters_ok = 0;
-	__u32 action = 0, table, vrftable, iif, oif;
+	__u32 action = 0, table, vrftable, iif, oif, l2dev;
 	struct ipv6_sr_hdr *srh;
 	char **argv = *argvp;
 	int argc = *argcp;
 	char segbuf[1024];
 	inet_prefix addr;
+	int l2dev_ok = 0;
 	__u32 hmac = 0;
 	int ret = 0;
 
@@ -1534,6 +1543,15 @@ static int parse_encap_seg6local(struct rtattr *rta, size_t len, int *argcp,
 			if (!oif)
 				exit(nodev(*argv));
 			ret = rta_addattr32(rta, len, SEG6_LOCAL_OIF, oif);
+		} else if (strcmp(*argv, "l2dev") == 0) {
+			NEXT_ARG();
+			if (l2dev_ok++)
+				duparg2("l2dev", *argv);
+			l2dev = ll_name_to_index(*argv);
+			if (!l2dev)
+				exit(nodev(*argv));
+			ret = rta_addattr32(rta, len, SEG6_LOCAL_L2DEV,
+					    l2dev);
 		} else if (strcmp(*argv, "count") == 0) {
 			if (counters_ok++)
 				duparg2("count", *argv);
