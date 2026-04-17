@@ -274,6 +274,10 @@ static void print_encap_seg6(FILE *fp, struct rtattr *encap)
 	}
 
 	print_srh(fp, tuninfo->srh);
+
+	if (tb[SEG6_IPTUNNEL_TABLE])
+		print_uint(PRINT_ANY, "lookup", "lookup %u ",
+			   rta_getattr_u32(tb[SEG6_IPTUNNEL_TABLE]));
 }
 
 static void print_rpl_srh(FILE *fp, struct ipv6_rpl_sr_hdr *srh)
@@ -955,7 +959,7 @@ static struct ipv6_sr_hdr *parse_srh(char *segbuf, int hmac, bool encap)
 static int parse_encap_seg6(struct rtattr *rta, size_t len, int *argcp,
 			    char ***argvp)
 {
-	int mode_ok = 0, segs_ok = 0, hmac_ok = 0;
+	int mode_ok = 0, segs_ok = 0, hmac_ok = 0, lookup_ok = 0;
 	struct seg6_iptunnel_encap *tuninfo = NULL;
 	struct ipv6_sr_hdr *srh;
 	char **argv = *argvp;
@@ -963,6 +967,7 @@ static int parse_encap_seg6(struct rtattr *rta, size_t len, int *argcp,
 	bool tunsrc = false;
 	inet_prefix saddr;
 	int argc = *argcp;
+	__u32 lookup = 0;
 	int encap = -1;
 	__u32 hmac = 0;
 	int ret = -1;
@@ -1006,6 +1011,13 @@ static int parse_encap_seg6(struct rtattr *rta, size_t len, int *argcp,
 			if (hmac_ok++)
 				duparg2("hmac", *argv);
 			get_u32(&hmac, *argv, 0);
+		} else if (strcmp(*argv, "lookup") == 0) {
+			NEXT_ARG();
+			if (lookup_ok++)
+				duparg2("lookup", *argv);
+			/* note that table 0 is considered an invalid value */
+			if (get_u32(&lookup, *argv, 0) || !lookup)
+				invarg("\"lookup\" value is invalid\n", *argv);
 		} else {
 			break;
 		}
@@ -1033,6 +1045,11 @@ static int parse_encap_seg6(struct rtattr *rta, size_t len, int *argcp,
 	if (tunsrc) {
 		if (rta_addattr_l(rta, len, SEG6_IPTUNNEL_SRC,
 				  &saddr.data, saddr.bytelen))
+			goto out;
+	}
+
+	if (lookup) {
+		if (rta_addattr32(rta, len, SEG6_IPTUNNEL_TABLE, lookup))
 			goto out;
 	}
 
