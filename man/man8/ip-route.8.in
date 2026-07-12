@@ -1030,6 +1030,21 @@ only accepts packets with either a zero Segments Left value or no SRH
 at all, and an inner IPv4 or IPv6 packet. Other matching packets are
 dropped.
 
+.B End.DT2U l2dev
+.I DEVICE
+- Decapsulate the inner Ethernet frame and deliver it locally on the
+specified L2 device.
+.I DEVICE
+must be either a bridge port or an
+.B sr6
+device. When
+.I DEVICE
+is a bridge port, the Linux bridge performs MAC source address learning,
+destination MAC lookup, and L2 forwarding within the local bridge
+domain. This action only accepts packets with either a zero Segments
+Left value or no SRH at all, and an inner Ethernet frame (protocol 143).
+Other matching packets are dropped.
+
 .B End.B6 srh segs
 .IR SEGMENTS " [ "
 .B hmac
@@ -1489,6 +1504,12 @@ Adds an IPv6 route with SRv6 encapsulation and two segments attached.
 ip -6 route add 2001:db8:1::/64 encap seg6local action End.DT46 vrftable 100 dev vrf100
 .RS 4
 Adds an IPv6 route with SRv6 decapsulation and forward with lookup in VRF table.
+.RE
+.PP
+ip -6 route add fc00::100/128 encap seg6local action End.DT2U l2dev sr6-0 dev eth0
+.RS 4
+Adds an IPv6 route with SRv6 L2 decapsulation and local delivery of the
+inner Ethernet frame on sr6-0.
 .RE
 .PP
 ip -6 route add 2001:db8:1::/64 encap seg6local action End flavors psp dev eth0
