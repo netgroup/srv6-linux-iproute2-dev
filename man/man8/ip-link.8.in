@@ -291,6 +291,7 @@ ip-link \- network device configuration
 .BR pfcp " |"
 .BR rmnet " |"
 .BR sit " |"
+.BR sr6 " |"
 .BR vcan " | "
 .BR veth " | "
 .BR virt_wifi " |"
@@ -442,6 +443,9 @@ Link types:
 .sp
 .BR sit
 - Virtual tunnel interface IPv6 over IPv4
+.sp
+.BR sr6
+- SRv6 L2 tunnel device
 .sp
 .B vcan
 - Virtual Controller Area Network interface
@@ -1595,6 +1599,51 @@ When
 .B ethertype
 is "ipv4", this allows the tunnel to also handle IPv6. This option is disabled
 by default.
+
+.TP
+SR6 Type Support
+For a link of type
+.I SR6
+the following additional arguments are supported:
+
+.BI "ip link add " DEVICE
+.BI type " sr6 " mode " { " full " | " reduced " } "
+.BI segs " SEG1,SEG2,...,SEGn"
+.RB "[ " table " \fITABLE_ID\fP ]"
+.RB "[ " hmac " \fIKEYID\fP ]"
+
+.in +8
+.sp
+.BR mode " { " full " | " reduced " } "
+- specifies how the segment list is encoded in the transmitted packet.
+With
+.B full
+the SRH carries the whole segment list. With
+.B reduced
+the SRH does not carry the first segment, which is already in the outer
+IPv6 destination address, and the SRH is 16 bytes shorter; when the
+segment list has a single segment and no HMAC is requested, no SRH is
+pushed at all. This argument is mandatory.
+.sp
+.BI segs " SEG1,SEG2,...,SEGn"
+- specifies the SRv6 segment list for encapsulation. The segments
+are IPv6 addresses separated by commas. Each L2 frame transmitted
+through the device is encapsulated in an IPv6 header with a Segment
+Routing Header (SRH) containing the specified segment list.
+.sp
+.BI table " TABLE_ID"
+- specifies the FIB table used for routing the outer IPv6+SRH packet
+toward the first SID. When set, fib rules are bypassed and the lookup
+is performed directly in the given table. When omitted, the route is
+resolved through the VRF context inherited from the device hierarchy.
+.sp
+.BI hmac " KEYID"
+- adds an HMAC TLV to the SRH and marks it with the HMAC flag, using
+the given key ID. The HMAC keys are configured separately with
+.BR "ip sr hmac" .
+When omitted, no HMAC TLV is added.
+
+.in -8
 
 .TP
 AMT Type Support
