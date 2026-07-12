@@ -291,6 +291,7 @@ ip-link \- network device configuration
 .BR pfcp " |"
 .BR rmnet " |"
 .BR sit " |"
+.BR sr6 " |"
 .BR vcan " | "
 .BR veth " | "
 .BR virt_wifi " |"
@@ -442,6 +443,9 @@ Link types:
 .sp
 .BR sit
 - Virtual tunnel interface IPv6 over IPv4
+.sp
+.BR sr6
+- SRv6 L2 tunnel device
 .sp
 .B vcan
 - Virtual Controller Area Network interface
@@ -1595,6 +1599,108 @@ When
 .B ethertype
 is "ipv4", this allows the tunnel to also handle IPv6. This option is disabled
 by default.
+
+.TP
+SR6 Type Support
+For a link of type
+.I SR6
+the following additional arguments are supported:
+
+.BI "ip link add " DEVICE
+.BI type " sr6 " mode " { " full " | " reduced " } "
+.BI segs " SEG1,SEG2,...,SEGn"
+.RB "[ " table " \fITABLE_ID\fP ]"
+.RB "[ " hmac " \fIKEYID\fP ]"
+
+.in +8
+.sp
+.BR mode " { " full " | " reduced " } "
+- specifies how the segment list is encoded in the transmitted packet.
+With
+.B full
+the SRH carries the whole segment list. With
+.B reduced
+the SRH does not repeat the first segment, which is already in the outer
+IPv6 destination address, when the list has more than one segment. With
+a single segment and no HMAC, no SRH is pushed at all. With a single
+segment and an HMAC, the SRH keeps that segment. This argument is
+mandatory when the device is created.
+.sp
+.BI segs " SEG1,SEG2,...,SEGn"
+- specifies the SRv6 segment list for encapsulation. The segments
+are IPv6 addresses separated by commas. Each L2 frame transmitted
+through the device is encapsulated in an IPv6 header whose destination
+address is the first segment. The Segment Routing Header (SRH), when one
+is pushed, is built from the list as described for
+.BR mode .
+.sp
+.BI table " TABLE_ID"
+- specifies the FIB table used for routing the outer IPv6+SRH packet
+toward the first SID. When set, fib rules are bypassed and the lookup
+is performed directly in the given table. When omitted, the route is
+resolved through the VRF context inherited from the device hierarchy.
+.sp
+.BI hmac " KEYID"
+- adds an HMAC TLV to the SRH and marks it with the HMAC flag, using
+the given key ID. The HMAC keys are configured separately with
+.BR "ip sr hmac" .
+When omitted, no HMAC TLV is added.
+
+.in -8
+
+.sp
+Change the configuration of a device that already exists.
+
+.BI "ip link set " DEVICE
+.RB "[ " mtu " \fIMTU\fP ]"
+.BI type " sr6 "
+.BI segs " SEG1,SEG2,...,SEGn"
+.RB "[ " mode " { " full " | " reduced " } ]"
+.RB "[ " table " \fITABLE_ID\fP ]"
+.RB "[ " hmac " \fIKEYID\fP ]"
+
+.in +8
+.sp
+The device keeps forwarding while its configuration is replaced.
+.sp
+.B segs
+is mandatory here as well. The command builds a new segment list inside
+a new SRH, with an HMAC TLV when
+.B hmac
+is given, and this SRH replaces the one the device had. A device
+configured with an HMAC TLV carries one after the change only if
+.B hmac
+is given again.
+.sp
+.B mode
+and
+.B table
+are not part of the SRH. They keep their value when the command leaves
+them out. A
+.I TABLE_ID
+different from the one configured is refused.
+.sp
+.B mode
+can be changed without recreating the device. Since
+.B segs
+is mandatory, a command that changes only the mode repeats the segment
+list the device already has. It also repeats
+.B hmac
+when the device carries an HMAC TLV.
+.sp
+The MTU is computed again from the new configuration. The encapsulation
+overhead depends on the size of the SRH that is pushed, which the
+segment list, the mode and
+.B hmac
+all change. An
+.B mtu
+given in the same command is used instead, so a command that leaves
+.B mtu
+out replaces an MTU set earlier with the default for the new
+configuration. An MTU that is not the default has to be given again on
+every change.
+
+.in -8
 
 .TP
 AMT Type Support
@@ -3275,6 +3381,13 @@ Creates a IP6ERSPAN version 2 interface named ip6erspan00.
 ip link set dev swp0 type dsa conduit eth1
 .RS 4
 Changes the conduit interface of the swp0 user port to eth1.
+.RE
+.PP
+ip link set dev sr6-0 type sr6 mode reduced segs fc00:3::e,fc00:2::d20
+.RS 4
+Changes the encapsulation mode of the sr6-0 device to reduced. The
+segment list is given again, since every change of an sr6 device
+carries one.
 .RE
 
 .SH SEE ALSO
